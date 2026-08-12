@@ -7,6 +7,15 @@
 <meta name="theme-color" content="#00A99D">
 <title>App ประกอบรูป ปงสนุก</title>
 
+<!-- PWA: ติดตั้งลงหน้าจอ + ทำงานออฟไลน์ -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ประกอบรูป">
+<meta name="mobile-web-app-capable" content="yes">
+
 <!-- ฟอนต์ไทยจาก Google Fonts (ต้องออนไลน์เฉพาะตอนโหลดฟอนต์ ที่เหลือทำงานออฟไลน์ได้) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -949,6 +958,14 @@ window.addEventListener('drop', e=>{
   updateDateDisplay();
   updateUI();
 })();
+
+/* ===== ลงทะเบียน Service Worker (PWA/ออฟไลน์) =====
+   ทำงานเฉพาะเมื่อเปิดผ่าน http(s) เท่านั้น (เปิดไฟล์ file:// จะข้าม) */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
