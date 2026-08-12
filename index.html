@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#00A99D">
-<title>รวมรูปรายงาน 6586</title>
+<title>App ประกอบรูป ปงสนุก</title>
 
 <!-- ฟอนต์ไทยจาก Google Fonts (ต้องออนไลน์เฉพาะตอนโหลดฟอนต์ ที่เหลือทำงานออฟไลน์ได้) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -291,7 +291,7 @@ button:focus-visible, input:focus-visible, label:focus-within{
 
   <!-- แถบบนสุด -->
   <header class="topbar">
-    <h1>รวมรูปรายงาน 6586</h1>
+    <h1>App ประกอบรูป ปงสนุก</h1>
     <button class="icon-btn" id="btnSettings" aria-label="ตั้งค่า" aria-expanded="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
@@ -305,8 +305,8 @@ button:focus-visible, input:focus-visible, label:focus-within{
   <section class="settings" id="settings" aria-hidden="true">
     <div class="settings-inner">
       <div class="field">
-        <label for="sender">ชื่อผู้ส่ง (ชื่อเล่นหรือรหัสพนักงาน)</label>
-        <input class="text-input" id="sender" type="text" inputmode="text" placeholder="เช่น ก้อง หรือ P1234" autocomplete="off">
+        <label for="sender">คำอธิบายเพิ่มเติม (ใส่ในป้ายใต้วันที่ ทุกรูป)</label>
+        <input class="text-input" id="sender" type="text" inputmode="text" placeholder="เช่น ผลักดันการขายสินค้าแลกซื้อ" autocomplete="off">
       </div>
 
       <div class="field">
@@ -339,6 +339,14 @@ button:focus-visible, input:focus-visible, label:focus-within{
         <div class="seg" id="segGrid4" role="group" aria-label="รูปแบบป้าย 4 รูป">
           <button type="button" data-grid4="bottom" aria-pressed="true">ป้ายล่าง</button>
           <button type="button" data-grid4="center" aria-pressed="false">จัดมุม (ป้ายกลาง)</button>
+        </div>
+      </div>
+
+      <div class="field" id="dupField" style="display:none">
+        <label>ทำซ้ำรูปเดียว (ใช้รูป 1 ใบ เติมทุกช่อง)</label>
+        <div class="seg" id="segDup" role="group" aria-label="ทำซ้ำรูปเดียว">
+          <button type="button" data-dup="off" aria-pressed="true">ปิด</button>
+          <button type="button" data-dup="on" aria-pressed="false">เปิด</button>
         </div>
       </div>
     </div>
@@ -405,6 +413,8 @@ const segLayout  = document.getElementById('segLayout');
 const layoutField= document.getElementById('layoutField');
 const segGrid4   = document.getElementById('segGrid4');
 const grid4Field = document.getElementById('grid4Field');
+const segDup     = document.getElementById('segDup');
+const dupField   = document.getElementById('dupField');
 const chat       = document.getElementById('chat');
 const chatTools  = document.getElementById('chatTools');
 const btnAll     = document.getElementById('btnAll');
@@ -416,7 +426,7 @@ const fileCam    = document.getElementById('fileCam');
 const dropOverlay= document.getElementById('dropOverlay');
 
 /* ===== สถานะแอป ===== */
-const state = { sets:[], pending:[], setCount:2, layout:'lr', grid4:'bottom' };
+const state = { sets:[], pending:[], setCount:2, layout:'lr', grid4:'bottom', dup:false };
 let nextId = 1;
 let pid = 1;
 let pendingEl = null;
@@ -429,7 +439,8 @@ function saveSettings(){
       sender: senderInput.value,
       count: state.setCount,
       layout: state.layout,
-      grid4: state.grid4
+      grid4: state.grid4,
+      dup: state.dup
     }));
   }catch(e){}
 }
@@ -455,8 +466,6 @@ function updateDateDisplay(){
 function buildFileName(index){
   const ymd=(dateInput.value||todayYMD()).replace(/-/g,'');
   const parts=['6586', ymd];
-  const name=senderInput.value.trim().replace(/[\\/:*?"<>|\s]+/g,'');
-  if(name) parts.push(name);                      // ตัดส่วนชื่อออกถ้าไม่ได้กรอก
   parts.push(String(index).padStart(2,'0'));
   return parts.join('_')+'.jpg';
 }
@@ -511,7 +520,7 @@ function roundRect(ctx,x,y,w,h,r){
 }
 
 /* ===== ประกอบภาพด้วย Canvas → คืนค่าเป็น Blob (JPEG 0.92) ===== */
-async function compose(images, layout, count, center){
+async function compose(images, layout, count, center, dup){
   const size=CANVAS_SIZE, half=size/2;
   const canvas=document.createElement('canvas');
   canvas.width=size; canvas.height=size;
@@ -535,8 +544,9 @@ async function compose(images, layout, count, center){
 
   // วาดรูปลงแต่ละช่อง (ชนกันพอดี ไม่มีเส้นคั่น)
   for(let i=0;i<cells.length;i++){
-    if(!images[i]) continue;
-    const img=await loadBitmap(images[i].file);
+    const src = dup ? images[0] : images[i];   // โหมดทำซ้ำ: ใช้รูปแรกเติมทุกช่อง
+    if(!src) continue;
+    const img=await loadBitmap(src.file);
     drawCover(ctx,img,cells[i][0],cells[i][1],cells[i][2],cells[i][3]);
     if(img.close) img.close();
   }
@@ -575,6 +585,28 @@ async function compose(images, layout, count, center){
     ctx.fillStyle='#16359b';                    // น้ำเงินเข้มเข้ากับตัวอักษรป้าย
     ctx.fillText(dateStr,dcx,dcy+1);
     ctx.textAlign='left';                       // รีเซ็ต
+
+    // คำอธิบายเพิ่มเติม (ถ้ากรอก) วางใต้วันที่ในป้าย เหนือโลโก้ Lotus's
+    const note=senderInput.value.trim();
+    if(note){
+      const ncx=size/2, ncy=sy+sh*0.79;
+      let nFont=Math.round(sw*0.05);
+      ctx.font=`600 ${nFont}px "Noto Sans Thai", system-ui, sans-serif`;
+      const maxW=sw*0.9;
+      let nw=ctx.measureText(note).width;
+      if(nw>maxW){                              // ย่อฟอนต์ให้พอดีความกว้างป้าย
+        nFont=Math.max(10,Math.floor(nFont*maxW/nw));
+        ctx.font=`600 ${nFont}px "Noto Sans Thai", system-ui, sans-serif`;
+        nw=ctx.measureText(note).width;
+      }
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      const npx=14*k, npy=6*k, nph=nFont+npy*2, npw=nw+npx*2;
+      ctx.fillStyle='rgba(255,255,255,0.92)';   // แผ่นขาวรองพื้นให้อ่านง่าย
+      roundRect(ctx,ncx-npw/2,ncy-nph/2,npw,nph,nph/2); ctx.fill();
+      ctx.fillStyle='#16359b';
+      ctx.fillText(note,ncx,ncy+1);
+      ctx.textAlign='left';
+    }
   }else{
     // สำรอง: ถ้าโหลดป้ายไม่ได้ ให้ปั๊มวันที่แคปซูลกลางล่าง
     ctx.font=`700 ${30*k}px "Noto Sans Thai", system-ui, sans-serif`;
@@ -584,23 +616,6 @@ async function compose(images, layout, count, center){
     roundRect(ctx,size/2-pw/2,size-40*k-ph,pw,ph,ph/2); ctx.fill();
     ctx.fillStyle='#fff'; ctx.fillText(dateStr,size/2,size-40*k-ph/2+1);
     ctx.textAlign='left';
-  }
-
-  // ชื่อผู้ส่ง (ถ้ากรอก) เป็นแคปซูลมุมซ้ายล่าง
-  const sender=senderInput.value.trim();
-  if(sender){
-    const fs=26*k;
-    ctx.font=`${fs}px "Noto Sans Thai", system-ui, sans-serif`;
-    ctx.textAlign='left'; ctx.textBaseline='middle';
-    const padX=18*k, padY=12*k;
-    const tw=ctx.measureText(sender).width;
-    const capH=fs+padY*2, capW=tw+padX*2;
-    const bx=24*k, by=size-24*k-capH;
-    ctx.fillStyle='rgba(0,0,0,0.55)';
-    roundRect(ctx,bx,by,capW,capH,capH/2);
-    ctx.fill();
-    ctx.fillStyle='#ffffff';
-    ctx.fillText(sender, bx+padX, by+capH/2+1);
   }
 
   return await new Promise(res=> canvas.toBlob(b=>res(b),'image/jpeg',JPEG_QUALITY));
@@ -646,7 +661,7 @@ function makeResultBubble(set){
 /* ===== เรนเดอร์ผลลัพธ์ลงบับเบิล ===== */
 async function renderSet(set){
   set.resultBubble.innerHTML='<div class="loading"><div class="spinner"></div>กำลังประมวลผล...</div>';
-  const blob=await compose(set.images, set.layout, set.setCount, set.grid4==='center');
+  const blob=await compose(set.images, set.layout, set.setCount, set.grid4==='center', set.dup);
   if(set.url) URL.revokeObjectURL(set.url);
   set.blob=blob;
   set.url=URL.createObjectURL(blob);
@@ -685,7 +700,7 @@ async function commitSet(images){
   const userRow=makeUserBubble(images);
   chat.appendChild(userRow);
 
-  const set={ id:nextId++, images:images.slice(), layout:state.layout, setCount:state.setCount, grid4:state.grid4, userRow:userRow, url:null, blob:null };
+  const set={ id:nextId++, images:images.slice(), layout:state.layout, setCount:state.setCount, grid4:state.grid4, dup:state.dup, userRow:userRow, url:null, blob:null };
   state.sets.push(set);
   const resultRow=makeResultBubble(set);
   chat.appendChild(resultRow);
@@ -743,6 +758,13 @@ function renderPending(){
 async function addFiles(fileList){
   const files=Array.from(fileList||[]).filter(f=>f.type.startsWith('image/'));
   if(files.length===0) return;
+  // โหมดทำซ้ำ: รูปแต่ละใบสร้างเป็น 1 ชุด (เติมทุกช่องด้วยรูปเดียว) ทันที
+  if(state.dup){
+    for(const f of files){
+      await commitSet([{ pid:pid++, file:f, url:URL.createObjectURL(f) }]);
+    }
+    return;
+  }
   files.forEach(f=> state.pending.push({ pid:pid++, file:f, url:URL.createObjectURL(f) }));
   await flushPending();
   renderPending();
@@ -827,6 +849,8 @@ function clearChat(){
   state.sets=[]; state.pending=[];
   if(pendingEl){ pendingEl.remove(); pendingEl=null; }
   chat.querySelectorAll('.row').forEach(r=>r.remove());
+  senderInput.value='';                 // ล้างคำอธิบายเพิ่มเติมด้วย (เริ่มแชทใหม่)
+  saveSettings();
   updateUI();
 }
 
@@ -853,6 +877,7 @@ dateInput.onchange=updateDateDisplay;
 function updateSubFields(){
   layoutField.style.display = state.setCount===2 ? '' : 'none';  // เลือกกริดย่อยเฉพาะ 2 รูป
   grid4Field.style.display  = state.setCount===4 ? '' : 'none';  // เลือกรูปแบบป้ายเฉพาะ 4 รูป
+  dupField.style.display    = state.setCount>1 ? '' : 'none';    // ทำซ้ำเฉพาะเมื่อมีหลายช่อง
 }
 segCount.onclick=async(e)=>{
   const b=e.target.closest('button[data-count]'); if(!b) return;
@@ -873,6 +898,17 @@ segGrid4.onclick=(e)=>{
   state.grid4=b.dataset.grid4;
   setPressed(segGrid4,'grid4',b.dataset.grid4);
   saveSettings();
+};
+segDup.onclick=async(e)=>{
+  const b=e.target.closest('button[data-dup]'); if(!b) return;
+  state.dup=(b.dataset.dup==='on');
+  setPressed(segDup,'dup',b.dataset.dup);
+  saveSettings();
+  // เปิดโหมดทำซ้ำ: เคลียร์คิวที่ค้าง (คิวใช้ไม่ได้ในโหมดนี้)
+  if(state.dup && state.pending.length){
+    state.pending.forEach(im=>URL.revokeObjectURL(im.url));
+    state.pending=[]; renderPending();
+  }
 };
 
 filePick.onchange=e=>{ addFiles(e.target.files); e.target.value=''; };
@@ -898,13 +934,15 @@ window.addEventListener('drop', e=>{
 /* ===== เริ่มต้น ===== */
 (function init(){
   const s=loadSettings();
-  if(s.sender) senderInput.value=s.sender;
-  if(s.count===4){ state.setCount=4; }
+  // คำอธิบายเพิ่มเติม: เว้นว่างเป็นดีฟอลต์เสมอ (ไม่จำค่าเดิม)
+  // จำนวนรูปต่อชุด: ดีฟอลต์ 2 รูป เสมอ (ไม่จำค่าเดิม)
+  // ทำซ้ำรูปเดียว: ดีฟอลต์ ปิด เสมอ (ไม่จำค่าเดิม)
   if(s.layout==='tb'){ state.layout='tb'; }
   if(s.grid4==='center'){ state.grid4='center'; }
   setPressed(segCount,'count',String(state.setCount));
   setPressed(segLayout,'layout',state.layout);
   setPressed(segGrid4,'grid4',state.grid4);
+  setPressed(segDup,'dup',state.dup?'on':'off');
   updateSubFields();
 
   dateInput.value=todayYMD();     // ค่าเริ่มต้นเป็นวันนี้
