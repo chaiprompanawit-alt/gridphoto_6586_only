@@ -107,7 +107,7 @@ body{
   max-height:0;
   transition:max-height .28s ease;
 }
-.settings.open{ max-height:520px; }
+.settings.open{ max-height:640px; }
 .settings-inner{ padding:14px 16px; display:flex; flex-direction:column; gap:16px; }
 .field{ display:flex; flex-direction:column; gap:6px; }
 .field label{ font-size:13px; font-weight:600; color:var(--muted); }
@@ -134,6 +134,18 @@ body{
   height:40px; padding:0 16px; border-radius:9px; cursor:pointer; min-width:64px;
 }
 .seg button[aria-pressed="true"]{ background:var(--primary); color:var(--white); }
+
+/* ปุ่มปรับใช้ (พับแผงตั้งค่า) */
+.apply-btn{
+  margin-top:4px;
+  height:48px; width:100%;
+  border:2px solid var(--primary);
+  background:var(--primary); color:#fff;
+  border-radius:12px;
+  font-family:inherit; font-size:16px; font-weight:700; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+}
+.apply-btn:active{ filter:brightness(.96); }
 
 /* ===== พื้นที่แชท ===== */
 .chat{
@@ -414,8 +426,8 @@ button:focus-visible, input:focus-visible, label:focus-within{
       <div class="field" id="grid4Field" style="display:none">
         <label>รูปแบบป้าย (4 รูป)</label>
         <div class="seg" id="segGrid4" role="group" aria-label="รูปแบบป้าย 4 รูป">
-          <button type="button" data-grid4="bottom" aria-pressed="true">ป้ายล่าง</button>
-          <button type="button" data-grid4="center" aria-pressed="false">จัดมุม (ป้ายกลาง)</button>
+          <button type="button" data-grid4="bottom" aria-pressed="false">ป้ายล่าง</button>
+          <button type="button" data-grid4="center" aria-pressed="true">จัดมุม (ป้ายกลาง)</button>
         </div>
       </div>
 
@@ -426,6 +438,8 @@ button:focus-visible, input:focus-visible, label:focus-within{
           <button type="button" data-dup="on" aria-pressed="false">เปิด</button>
         </div>
       </div>
+
+      <button type="button" class="apply-btn" id="btnApply">ปรับใช้</button>
     </div>
   </section>
 
@@ -500,6 +514,7 @@ const LINE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="tru
 const settings   = document.getElementById('settings');
 const btnSettings= document.getElementById('btnSettings');
 const btnClear   = document.getElementById('btnClear');
+const btnApply   = document.getElementById('btnApply');
 const senderInput= document.getElementById('sender');
 const dateInput  = document.getElementById('date');
 const dateDisplay= document.getElementById('dateDisplay');
@@ -528,7 +543,7 @@ const editCancel = document.getElementById('editCancel');
 const editSave   = document.getElementById('editSave');
 
 /* ===== สถานะแอป ===== */
-const state = { sets:[], pending:[], setCount:2, layout:'lr', grid4:'bottom', dup:false };
+const state = { sets:[], pending:[], setCount:2, layout:'lr', grid4:'center', dup:false };
 let nextId = 1;
 let pid = 1;
 let pendingEl = null;
@@ -973,11 +988,13 @@ function setPressed(group, attr, value){
 }
 
 /* ===== ผูกเหตุการณ์ ===== */
-btnSettings.onclick=()=>{
-  const open=settings.classList.toggle('open');
+function setSettingsOpen(open){
+  settings.classList.toggle('open', open);
   btnSettings.setAttribute('aria-expanded', String(open));
   settings.setAttribute('aria-hidden', String(!open));
-};
+}
+btnSettings.onclick=()=> setSettingsOpen(!settings.classList.contains('open'));
+btnApply.onclick=()=> setSettingsOpen(false);   // ปรับใช้ = พับแผงเก็บ
 btnClear.onclick=clearChat;
 btnAll.onclick=downloadAll;
 btnShareAll.onclick=shareAll;
@@ -1247,7 +1264,7 @@ window.addEventListener('resize', ()=>{ if(ED.set) applyAll(); });
   // จำนวนรูปต่อชุด: ดีฟอลต์ 2 รูป เสมอ (ไม่จำค่าเดิม)
   // ทำซ้ำรูปเดียว: ดีฟอลต์ ปิด เสมอ (ไม่จำค่าเดิม)
   if(s.layout==='tb'){ state.layout='tb'; }
-  if(s.grid4==='center'){ state.grid4='center'; }
+  if(s.grid4==='bottom'){ state.grid4='bottom'; }   // ดีฟอลต์ ป้ายกลาง, จำค่าเดิมถ้าเคยเลือกป้ายล่าง
   setPressed(segCount,'count',String(state.setCount));
   setPressed(segLayout,'layout',state.layout);
   setPressed(segGrid4,'grid4',state.grid4);
