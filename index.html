@@ -289,6 +289,74 @@ button:focus-visible, input:focus-visible, label:focus-within{
 }
 .drop-overlay.show{ display:flex; }
 
+/* ===== หน้าต่างปรับมุมรูป ===== */
+.editor-overlay{
+  position:fixed; inset:0; z-index:100;
+  background:rgba(0,0,0,.55);
+  display:none; align-items:center; justify-content:center;
+  padding:16px;
+}
+.editor-overlay.show{ display:flex; }
+.editor{
+  background:var(--white); border-radius:18px;
+  width:100%; max-width:360px;
+  padding:16px; max-height:92dvh; overflow:auto;
+  display:flex; flex-direction:column; gap:12px;
+}
+.editor h2{ font-size:17px; font-weight:700; margin:0; }
+.editor .hint{ font-size:12.5px; color:var(--muted); margin:0; line-height:1.6; }
+.edit-grid{
+  width:100%; aspect-ratio:1/1;
+  display:grid; gap:4px;
+  background:#dfe6e5; border-radius:12px; overflow:hidden;
+  touch-action:none; user-select:none; -webkit-user-select:none;
+}
+.edit-cell{
+  position:relative; overflow:hidden; background:#c9d2d1;
+  cursor:grab;
+}
+.edit-cell img{
+  position:absolute; left:50%; top:50%;
+  transform-origin:center center;
+  will-change:transform; pointer-events:none;
+  max-width:none;               /* ใช้ขนาดจริงของรูป */
+}
+.edit-cell .num{
+  position:absolute; top:5px; left:5px; z-index:2;
+  min-width:22px; height:22px; padding:0 6px; border-radius:11px;
+  background:rgba(0,0,0,.55); color:#fff;
+  font-size:12px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+.edit-cell.selected{ outline:3px solid var(--primary); outline-offset:-3px; }
+.edit-cell.lift{ opacity:.35; }
+.edit-cell.target{ outline:3px dashed var(--primary); outline-offset:-3px; }
+.drag-ghost{
+  position:fixed; z-index:120; width:84px; height:84px;
+  border-radius:12px; overflow:hidden; pointer-events:none;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);
+  transform:translate(-50%,-50%);
+}
+.drag-ghost img{ width:100%; height:100%; object-fit:cover; }
+.edit-tools{ display:flex; flex-direction:column; gap:8px; }
+.edit-tools .rowt{ display:flex; align-items:center; gap:10px; }
+.edit-tools .rowt span{ font-size:13px; font-weight:600; color:var(--muted); width:42px; flex:0 0 auto; }
+.edit-tools input[type=range]{ flex:1; accent-color:var(--primary); height:28px; }
+.edit-tools .mini{
+  align-self:flex-start;
+  height:36px; padding:0 14px; border-radius:9px;
+  border:1.5px solid var(--line); background:var(--white);
+  font-family:inherit; font-size:13px; font-weight:600; color:var(--text); cursor:pointer;
+}
+.editor-actions{ display:flex; gap:8px; }
+.editor-actions button{
+  flex:1; height:48px; border-radius:12px;
+  font-family:inherit; font-weight:700; font-size:15px; cursor:pointer;
+  border:2px solid var(--primary);
+}
+.editor-actions .save{ background:var(--primary); color:#fff; }
+.editor-actions .cancel{ background:var(--white); color:var(--primary-dark); }
+
 /* เคารพผู้ที่ตั้งค่าลดการเคลื่อนไหว */
 @media (prefers-reduced-motion: reduce){
   *{ animation:none !important; transition:none !important; }
@@ -396,6 +464,24 @@ button:focus-visible, input:focus-visible, label:focus-within{
 
 <div class="drop-overlay" id="dropOverlay">วางรูปที่นี่เพื่อเพิ่ม</div>
 
+<!-- หน้าต่างปรับมุมรูป -->
+<div class="editor-overlay" id="editorOverlay" aria-hidden="true">
+  <div class="editor" role="dialog" aria-modal="true" aria-label="ปรับมุมรูป">
+    <h2>ปรับมุมรูป</h2>
+    <p class="hint">แตะรูปเพื่อเลือก • ลากเพื่อเลื่อน • ใช้สองนิ้ว/แถบด้านล่างเพื่อซูมและหมุน • กดรูปค้างเพื่อยกไปสลับตำแหน่ง</p>
+    <div class="edit-grid" id="editGrid"></div>
+    <div class="edit-tools" id="editTools">
+      <div class="rowt"><span>ซูม</span><input type="range" id="zoomRange" min="50" max="400" value="100" aria-label="ซูมรูปที่เลือก"></div>
+      <div class="rowt"><span>หมุน</span><input type="range" id="rotRange" min="-180" max="180" value="0" aria-label="หมุนรูปที่เลือก"></div>
+      <button type="button" class="mini" id="resetCell">รีเซ็ตรูปที่เลือก</button>
+    </div>
+    <div class="editor-actions">
+      <button type="button" class="cancel" id="editCancel">ยกเลิก</button>
+      <button type="button" class="save" id="editSave">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 
@@ -433,6 +519,13 @@ const emptyText  = document.getElementById('emptyText');
 const filePick   = document.getElementById('filePick');
 const fileCam    = document.getElementById('fileCam');
 const dropOverlay= document.getElementById('dropOverlay');
+const editorOverlay= document.getElementById('editorOverlay');
+const editGrid   = document.getElementById('editGrid');
+const zoomRange  = document.getElementById('zoomRange');
+const rotRange   = document.getElementById('rotRange');
+const resetCell  = document.getElementById('resetCell');
+const editCancel = document.getElementById('editCancel');
+const editSave   = document.getElementById('editSave');
 
 /* ===== สถานะแอป ===== */
 const state = { sets:[], pending:[], setCount:2, layout:'lr', grid4:'bottom', dup:false };
@@ -506,14 +599,23 @@ function loadStamp(){
   return stampPromise;
 }
 
-/* ===== วาดรูปแบบ object-fit: cover (ครอปกึ่งกลาง) ===== */
-function drawCover(ctx,img,x,y,w,h){
+/* ===== ค่าปรับมุมรูปเริ่มต้น (ไม่ขยับ) ===== */
+function defaultTf(){ return { ox:0, oy:0, s:1, rot:0 }; }
+
+/* ===== วาดรูปลงช่อง โดยเริ่มจาก cover แล้วปรับตาม transform (เลื่อน/ซูม/หมุน) =====
+   ox,oy = สัดส่วนการเลื่อนเทียบขนาดช่อง / s = ตัวคูณซูมจากฐาน cover / rot = องศา */
+function drawCell(ctx,img,x,y,w,h,tf){
   const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
-  const ir=iw/ih, cr=w/h;
-  let sx,sy,sw,sh;
-  if(ir>cr){ sh=ih; sw=ih*cr; sx=(iw-sw)/2; sy=0; }   // รูปกว้างกว่าช่อง → ครอปข้าง
-  else     { sw=iw; sh=iw/cr; sx=0; sy=(ih-sh)/2; }   // รูปสูงกว่าช่อง → ครอปบนล่าง
-  ctx.drawImage(img,sx,sy,sw,sh,x,y,w,h);
+  const cover=Math.max(w/iw, h/ih);       // ฐาน: ครอปให้เต็มช่อง
+  const t = tf || defaultTf();
+  const s = cover*(t.s||1);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();       // ตัดขอบให้อยู่ในช่อง
+  ctx.translate(x+w/2 + (t.ox||0)*w, y+h/2 + (t.oy||0)*h);
+  ctx.rotate((t.rot||0)*Math.PI/180);
+  ctx.scale(s,s);
+  ctx.drawImage(img, -iw/2, -ih/2);
+  ctx.restore();
 }
 
 /* ===== สี่เหลี่ยมมุมโค้ง ===== */
@@ -556,7 +658,7 @@ async function compose(images, layout, count, center, dup){
     const src = dup ? images[0] : images[i];   // โหมดทำซ้ำ: ใช้รูปแรกเติมทุกช่อง
     if(!src) continue;
     const img=await loadBitmap(src.file);
-    drawCover(ctx,img,cells[i][0],cells[i][1],cells[i][2],cells[i][3]);
+    drawCell(ctx,img,cells[i][0],cells[i][1],cells[i][2],cells[i][3], src.tf);
     if(img.close) img.close();
   }
 
@@ -690,8 +792,8 @@ async function renderSet(set){
   bDl.onclick=()=>downloadSet(set);
 
   const bRot=document.createElement('button'); bRot.className='action';
-  bRot.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>หมุนลำดับรูป';
-  bRot.onclick=async()=>{ set.images.push(set.images.shift()); await renderSet(set); };
+  bRot.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>ปรับมุมรูป';
+  bRot.onclick=()=>openEditor(set);
 
   const bDel=document.createElement('button'); bDel.className='action danger';
   bDel.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>ลบ';
@@ -939,6 +1041,204 @@ window.addEventListener('drop', e=>{
   e.preventDefault(); dragDepth=0; dropOverlay.classList.remove('show');
   if(e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
 });
+
+/* ===================================================================
+   ===== หน้าต่างปรับมุมรูป (เลื่อน/ซูม/หมุน + กดค้างเพื่อสลับ) =====
+   =================================================================== */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ED={ set:null, order:[], cells:[], tfMap:null, sel:-1, swapEnabled:false,
+  pointers:new Map(), mode:null, ghost:null, srcCellIdx:-1, lpTimer:null,
+  start:null, last:null, last2:null, pinchRef:null };
+
+function openEditor(set){
+  ED.set=set;
+  ED.swapEnabled = !set.dup && set.setCount>1;
+  const n=set.setCount;
+  if(set.dup)        ED.order=Array.from({length:n},()=>set.images[0]);
+  else if(n===1)     ED.order=[set.images[0]];
+  else               ED.order=set.images.slice(0,n);
+  // ค่าปรับมุม (working) แยกตามรูปจริง (ref) จะได้กดยกเลิกแล้วไม่กระทบของเดิม
+  ED.tfMap=new Map();
+  [...new Set(ED.order)].forEach(ref=>ED.tfMap.set(ref, Object.assign(defaultTf(), ref.tf||{})));
+  buildEditGrid();
+  editorOverlay.classList.add('show');
+  editorOverlay.setAttribute('aria-hidden','false');
+  requestAnimationFrame(()=>selectCell(0));
+}
+
+function buildEditGrid(){
+  const n=ED.order.length, layout=ED.set.layout, count=ED.set.setCount;
+  let cols='1fr 1fr', rows='1fr';
+  if(count===1){ cols='1fr'; rows='1fr'; }
+  else if(count===4){ cols='1fr 1fr'; rows='1fr 1fr'; }
+  else if(layout==='tb'){ cols='1fr'; rows='1fr 1fr'; }
+  else { cols='1fr 1fr'; rows='1fr'; }
+  editGrid.style.gridTemplateColumns=cols;
+  editGrid.style.gridTemplateRows=rows;
+  editGrid.innerHTML='';
+  ED.cells=[];
+  for(let i=0;i<n;i++){
+    const ref=ED.order[i];
+    const cell=document.createElement('div'); cell.className='edit-cell'; cell.dataset.index=i;
+    const img=document.createElement('img'); img.alt=''; img.draggable=false;
+    cell.appendChild(img);
+    if(ED.swapEnabled){ const num=document.createElement('div'); num.className='num'; num.textContent=i+1; cell.appendChild(num); }
+    editGrid.appendChild(cell);
+    const c={el:cell, img, ref, iw:ref._iw||0, ih:ref._ih||0};
+    ED.cells.push(c);
+    bindCellImage(c,i);
+  }
+}
+function bindCellImage(c,i){
+  c.img.onload=()=>{ c.ref._iw=c.img.naturalWidth; c.ref._ih=c.img.naturalHeight; c.iw=c.ref._iw; c.ih=c.ref._ih; applyCell(i); };
+  c.img.src=c.ref.url;
+  if(c.iw) applyCell(i);
+}
+function applyCell(i){
+  const c=ED.cells[i]; if(!c||!c.iw) return;
+  const rect=c.el.getBoundingClientRect(); const vw=rect.width, vh=rect.height;
+  const tf=ED.tfMap.get(c.ref);
+  const base=Math.max(vw/c.iw, vh/c.ih);
+  const k=base*(tf.s||1);
+  c.img.style.transform=`translate(-50%,-50%) translate(${(tf.ox||0)*vw}px, ${(tf.oy||0)*vh}px) rotate(${tf.rot||0}deg) scale(${k})`;
+}
+function applyAll(){ ED.cells.forEach((c,i)=>applyCell(i)); }
+
+function selectCell(i){
+  if(i<0||i>=ED.cells.length) return;
+  ED.sel=i;
+  ED.cells.forEach((c,idx)=>c.el.classList.toggle('selected', idx===i));
+  syncSliders();
+}
+function syncSliders(){
+  if(ED.sel<0) return;
+  const tf=ED.tfMap.get(ED.cells[ED.sel].ref);
+  zoomRange.value=String(clamp(Math.round((tf.s||1)*100), +zoomRange.min, +zoomRange.max));
+  rotRange.value=String(clamp(Math.round(tf.rot||0), +rotRange.min, +rotRange.max));
+}
+
+/* ----- ท่าทางนิ้ว/เมาส์ ----- */
+function pinchData(pts){
+  const [a,b]=pts, dx=b.x-a.x, dy=b.y-a.y;
+  return { dist:Math.hypot(dx,dy)||1, ang:Math.atan2(dy,dx)*180/Math.PI, mx:(a.x+b.x)/2, my:(a.y+b.y)/2 };
+}
+editGrid.addEventListener('pointerdown', e=>{
+  const cellEl=e.target.closest('.edit-cell'); if(!cellEl) return;
+  e.preventDefault();
+  try{ editGrid.setPointerCapture(e.pointerId); }catch(_){}
+  const i=+cellEl.dataset.index;
+  ED.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,i});
+  if(ED.pointers.size===1){
+    selectCell(i);
+    ED.mode=null; ED.srcCellIdx=i;
+    ED.start={x:e.clientX,y:e.clientY}; ED.last={x:e.clientX,y:e.clientY};
+    if(ED.swapEnabled){
+      clearTimeout(ED.lpTimer);
+      ED.lpTimer=setTimeout(()=>startSwap(i, ED.last.x, ED.last.y), 350);
+    }
+  }else if(ED.pointers.size===2){
+    clearTimeout(ED.lpTimer);
+    ED.mode='pinch';
+    ED.pinchRef=ED.cells[ED.sel]?ED.cells[ED.sel].ref:ED.cells[i].ref;
+    ED.last2=pinchData([...ED.pointers.values()]);
+  }
+});
+editGrid.addEventListener('pointermove', e=>{
+  const p=ED.pointers.get(e.pointerId); if(!p) return;
+  p.x=e.clientX; p.y=e.clientY;
+  if(ED.mode==='swap'){ moveGhost(e.clientX,e.clientY); highlightTarget(e.clientX,e.clientY); return; }
+  if(ED.pointers.size>=2 && ED.mode==='pinch'){
+    const cur=pinchData([...ED.pointers.values()].slice(0,2));
+    const ref=ED.pinchRef, tf=ED.tfMap.get(ref);
+    tf.s=clamp((tf.s||1)*(cur.dist/ED.last2.dist), 0.2, 8);
+    tf.rot=(tf.rot||0)+(cur.ang-ED.last2.ang);
+    const c=ED.cells[ED.sel]||ED.cells[0]; const rect=c.el.getBoundingClientRect();
+    tf.ox=(tf.ox||0)+(cur.mx-ED.last2.mx)/rect.width;
+    tf.oy=(tf.oy||0)+(cur.my-ED.last2.my)/rect.height;
+    ED.last2=cur; applyAll(); syncSliders();
+    return;
+  }
+  if(ED.pointers.size===1){
+    if(ED.mode!=='pan' && Math.hypot(e.clientX-ED.start.x, e.clientY-ED.start.y)>8){
+      clearTimeout(ED.lpTimer); ED.mode='pan';
+    }
+    if(ED.mode==='pan'){
+      const c=ED.cells[ED.srcCellIdx]; const rect=c.el.getBoundingClientRect();
+      const tf=ED.tfMap.get(c.ref);
+      tf.ox=(tf.ox||0)+(e.clientX-ED.last.x)/rect.width;
+      tf.oy=(tf.oy||0)+(e.clientY-ED.last.y)/rect.height;
+      applyAll();
+    }
+    ED.last={x:e.clientX,y:e.clientY};
+  }
+});
+function endPointer(e){
+  clearTimeout(ED.lpTimer);
+  if(ED.mode==='swap') finishSwap(e.clientX,e.clientY);
+  ED.pointers.delete(e.pointerId);
+  if(ED.pointers.size===0){ ED.mode=null; }
+  else if(ED.pointers.size===1){
+    const rp=[...ED.pointers.values()][0];
+    ED.last={x:rp.x,y:rp.y}; ED.mode='pan';   // เหลือนิ้วเดียว → เลื่อนต่อได้
+  }
+}
+editGrid.addEventListener('pointerup', endPointer);
+editGrid.addEventListener('pointercancel', e=>{ clearTimeout(ED.lpTimer); cleanupSwap(); ED.pointers.delete(e.pointerId); if(ED.pointers.size===0) ED.mode=null; });
+
+/* ----- สลับตำแหน่งด้วยการกดค้าง ----- */
+function startSwap(i,x,y){
+  ED.mode='swap'; ED.srcCellIdx=i;
+  ED.cells[i].el.classList.add('lift');
+  const g=document.createElement('div'); g.className='drag-ghost';
+  const im=document.createElement('img'); im.src=ED.cells[i].ref.url; g.appendChild(im);
+  document.body.appendChild(g); ED.ghost=g; moveGhost(x,y);
+  if(navigator.vibrate) try{ navigator.vibrate(15); }catch(_){}
+}
+function moveGhost(x,y){ if(ED.ghost){ ED.ghost.style.left=x+'px'; ED.ghost.style.top=y+'px'; } }
+function highlightTarget(x,y){
+  const el=document.elementFromPoint(x,y); const cellEl=el&&el.closest?el.closest('.edit-cell'):null;
+  ED.cells.forEach(c=>c.el.classList.remove('target'));
+  if(cellEl && +cellEl.dataset.index!==ED.srcCellIdx) cellEl.classList.add('target');
+}
+function finishSwap(x,y){
+  const el=document.elementFromPoint(x,y); const cellEl=el&&el.closest?el.closest('.edit-cell'):null;
+  if(cellEl){
+    const j=+cellEl.dataset.index;
+    if(j!==ED.srcCellIdx){
+      const t=ED.order[ED.srcCellIdx]; ED.order[ED.srcCellIdx]=ED.order[j]; ED.order[j]=t;
+      for(let i=0;i<ED.cells.length;i++){ ED.cells[i].ref=ED.order[i]; ED.cells[i].iw=ED.order[i]._iw||0; ED.cells[i].ih=ED.order[i]._ih||0; bindCellImage(ED.cells[i],i); }
+    }
+  }
+  cleanupSwap();
+}
+function cleanupSwap(){
+  if(ED.ghost){ ED.ghost.remove(); ED.ghost=null; }
+  ED.cells.forEach(c=>c.el.classList.remove('lift','target'));
+  ED.mode=null;
+}
+
+/* ----- แถบเลื่อน ซูม/หมุน + รีเซ็ต ----- */
+zoomRange.oninput=()=>{ if(ED.sel<0) return; ED.tfMap.get(ED.cells[ED.sel].ref).s=+zoomRange.value/100; applyAll(); };
+rotRange.oninput =()=>{ if(ED.sel<0) return; ED.tfMap.get(ED.cells[ED.sel].ref).rot=+rotRange.value; applyAll(); };
+resetCell.onclick=()=>{ if(ED.sel<0) return; const ref=ED.cells[ED.sel].ref; ED.tfMap.set(ref, defaultTf()); syncSliders(); applyAll(); };
+
+/* ----- ปิด/บันทึก ----- */
+function closeEditor(save){
+  const s=ED.set;
+  if(save && s){
+    ED.tfMap.forEach((tf,ref)=>{ ref.tf=Object.assign({},tf); });
+    if(ED.swapEnabled) s.images=ED.order.slice();
+  }
+  editorOverlay.classList.remove('show');
+  editorOverlay.setAttribute('aria-hidden','true');
+  cleanupSwap();
+  ED.pointers.clear(); ED.set=null; ED.cells=[]; ED.sel=-1;
+  if(save && s) renderSet(s);
+}
+editCancel.onclick=()=>closeEditor(false);
+editSave.onclick=()=>closeEditor(true);
+editorOverlay.addEventListener('pointerdown', e=>{ if(e.target===editorOverlay) closeEditor(false); });
+window.addEventListener('resize', ()=>{ if(ED.set) applyAll(); });
 
 /* ===== เริ่มต้น ===== */
 (function init(){
