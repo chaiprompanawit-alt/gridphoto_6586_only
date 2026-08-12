@@ -322,16 +322,19 @@ button:focus-visible, input:focus-visible, label:focus-within{
   display:grid; gap:4px;
   background:#dfe6e5; border-radius:12px; overflow:hidden;
   touch-action:none; user-select:none; -webkit-user-select:none;
+  -webkit-touch-callout:none;   /* กันเมนู "บันทึกรูปภาพ" ตอนกดค้าง */
 }
 .edit-cell{
   position:relative; overflow:hidden; background:#c9d2d1;
   cursor:grab;
+  -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
 }
 .edit-cell img{
   position:absolute; left:50%; top:50%;
   transform-origin:center center;
   will-change:transform; pointer-events:none;
   max-width:none;               /* ใช้ขนาดจริงของรูป */
+  -webkit-touch-callout:none; -webkit-user-drag:none; user-select:none;
 }
 .edit-cell .num{
   position:absolute; top:5px; left:5px; z-index:2;
@@ -1200,6 +1203,7 @@ function endPointer(e){
     ED.last={x:rp.x,y:rp.y}; ED.mode='pan';   // เหลือนิ้วเดียว → เลื่อนต่อได้
   }
 }
+editGrid.addEventListener('contextmenu', e=>e.preventDefault());   // กันเมนูบันทึกรูป/คลิกขวา
 editGrid.addEventListener('pointerup', endPointer);
 editGrid.addEventListener('pointercancel', e=>{ clearTimeout(ED.lpTimer); cleanupSwap(); ED.pointers.delete(e.pointerId); if(ED.pointers.size===0) ED.mode=null; });
 

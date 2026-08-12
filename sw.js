@@ -2,7 +2,7 @@
    - แคชไฟล์แอป (app shell) ให้เปิดออฟไลน์ได้
    - แคชฟอนต์ไทยจาก Google Fonts แบบ cache-first (หลังโหลดครั้งแรกออนไลน์)
 */
-const VERSION = 'v4';
+const VERSION = 'v5';
 const APP_CACHE  = 'app-' + VERSION;      // ไฟล์หลักของแอป
 const FONT_CACHE = 'font-' + VERSION;     // ฟอนต์ (ข้ามโดเมน)
 
