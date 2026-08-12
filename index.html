@@ -320,6 +320,7 @@ button:focus-visible, input:focus-visible, label:focus-within{
       <div class="field">
         <label>จำนวนรูปต่อชุด</label>
         <div class="seg" id="segCount" role="group" aria-label="จำนวนรูปต่อชุด">
+          <button type="button" data-count="1" aria-pressed="false">1 รูป</button>
           <button type="button" data-count="2" aria-pressed="true">2 รูป</button>
           <button type="button" data-count="4" aria-pressed="false">4 รูป</button>
         </div>
@@ -522,7 +523,9 @@ async function compose(images, layout, count, center){
 
   // กำหนดช่องตามเลย์เอาต์ (สัดส่วนตามขนาดผืนผ้าใบ)
   let cells;
-  if(count===4){
+  if(count===1){
+    cells=[[0,0,size,size]];                      // รูปเดียวเต็มผืนผ้าใบ
+  }else if(count===4){
     cells=[[0,0,half,half],[half,0,half,half],[0,half,half,half],[half,half,half,half]]; // ซบ→ขบ→ซล→ขล
   }else if(layout==='tb'){
     cells=[[0,0,size,half],[0,half,size,half]];   // บน-ล่าง
@@ -753,6 +756,10 @@ async function flushPending(){
   }
 }
 
+/* ตรวจว่าเป็น iOS (iPhone/iPad) ที่ดาวน์โหลดตรงเข้าแกลเลอรีไม่ได้ */
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+
 /* ===== ดาวน์โหลดหนึ่งไฟล์ ===== */
 function triggerDownload(url, name){
   const a=document.createElement('a');
@@ -761,9 +768,19 @@ function triggerDownload(url, name){
 }
 function downloadSet(set){
   if(!set.url) return;
+  // iOS เซฟลงแกลเลอรีตรง ๆ ไม่ได้ → เปิด Share sheet ให้เลือก "บันทึกภาพ"
+  if(IS_IOS && set.blob && navigator.canShare){
+    const file=setToFile(set, state.sets.indexOf(set)+1);
+    if(navigator.canShare({ files:[file] })){
+      navigator.share({ files:[file] }).catch(()=>{});
+      return;
+    }
+  }
   triggerDownload(set.url, buildFileName(state.sets.indexOf(set)+1));
 }
 async function downloadAll(){
+  // iOS: ดาวน์โหลดหลายไฟล์พร้อมกันไม่ได้ → ใช้ Share sheet (เลือก "บันทึกภาพ")
+  if(IS_IOS){ await shareAll(); return; }
   for(let i=0;i<state.sets.length;i++){
     const s=state.sets[i];
     if(!s.url) continue;
@@ -780,7 +797,7 @@ async function shareSet(set){
   if(!set.blob) return;
   const file=setToFile(set, state.sets.indexOf(set)+1);
   if(navigator.canShare && navigator.canShare({ files:[file] })){
-    try{ await navigator.share({ files:[file], title:'รายงาน 6586' }); }
+    try{ await navigator.share({ files:[file] }); }
     catch(e){ /* ผู้ใช้ยกเลิก */ }
   }else{
     // อุปกรณ์ไม่รองรับแชร์ไฟล์ตรง → ดาวน์โหลดแล้วส่งไลน์เอง
@@ -792,7 +809,7 @@ async function shareAll(){
   const files=state.sets.filter(s=>s.blob).map((s,i)=>setToFile(s, i+1));
   if(files.length===0) return;
   if(navigator.canShare && navigator.canShare({ files })){
-    try{ await navigator.share({ files, title:'รายงาน 6586' }); }
+    try{ await navigator.share({ files }); }
     catch(e){ /* ยกเลิก */ }
   }else if(files.length===1){
     await shareSet(state.sets[0]);
