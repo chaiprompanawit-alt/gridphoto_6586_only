@@ -884,6 +884,7 @@ function renderPending(){
 async function addFiles(fileList){
   const files=Array.from(fileList||[]).filter(f=>f.type.startsWith('image/'));
   if(files.length===0) return;
+  setSettingsOpen(false);              // เริ่มมีรูปแล้ว → พับแผงตั้งค่าอัตโนมัติ
   // โหมดทำซ้ำ: รูปแต่ละใบสร้างเป็น 1 ชุด (เติมทุกช่องด้วยรูปเดียว) ทันที
   if(state.dup){
     for(const f of files){
