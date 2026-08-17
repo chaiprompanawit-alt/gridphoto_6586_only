@@ -135,6 +135,11 @@ body{
 }
 .seg button[aria-pressed="true"]{ background:var(--primary); color:var(--white); }
 
+/* ตารางเลือกตำแหน่งป้าย 3x3 (เว้นกลางซ้าย/กลางขวา) */
+.seg.pos{ display:grid; grid-template-columns:repeat(3,1fr); gap:4px; max-width:280px; }
+.seg.pos button{ min-width:0; padding:0 6px; font-size:13px; }
+.seg.pos .spacer{ height:40px; }
+
 /* ปุ่มปรับใช้ (พับแผงตั้งค่า) */
 .apply-btn{
   margin-top:4px;
@@ -426,11 +431,18 @@ button:focus-visible, input:focus-visible, label:focus-within{
         </div>
       </div>
 
-      <div class="field" id="grid4Field" style="display:none">
-        <label>รูปแบบป้าย (4 รูป)</label>
-        <div class="seg" id="segGrid4" role="group" aria-label="รูปแบบป้าย 4 รูป">
-          <button type="button" data-grid4="bottom" aria-pressed="false">ป้ายล่าง</button>
-          <button type="button" data-grid4="center" aria-pressed="true">จัดมุม (ป้ายกลาง)</button>
+      <div class="field" id="stampField">
+        <label>ตำแหน่งป้าย</label>
+        <div class="seg pos" id="segStamp" role="group" aria-label="ตำแหน่งป้าย">
+          <button type="button" data-pos="tl" aria-pressed="false">ซ้ายบน</button>
+          <button type="button" data-pos="tc" aria-pressed="false">กลางบน</button>
+          <button type="button" data-pos="tr" aria-pressed="false">ขวาบน</button>
+          <span class="spacer"></span>
+          <button type="button" data-pos="c" aria-pressed="true">กลาง</button>
+          <span class="spacer"></span>
+          <button type="button" data-pos="bl" aria-pressed="false">ซ้ายล่าง</button>
+          <button type="button" data-pos="bc" aria-pressed="false">กลางล่าง</button>
+          <button type="button" data-pos="br" aria-pressed="false">ขวาล่าง</button>
         </div>
       </div>
 
@@ -524,8 +536,8 @@ const dateDisplay= document.getElementById('dateDisplay');
 const segCount   = document.getElementById('segCount');
 const segLayout  = document.getElementById('segLayout');
 const layoutField= document.getElementById('layoutField');
-const segGrid4   = document.getElementById('segGrid4');
-const grid4Field = document.getElementById('grid4Field');
+const segStamp   = document.getElementById('segStamp');
+const stampField = document.getElementById('stampField');
 const segDup     = document.getElementById('segDup');
 const dupField   = document.getElementById('dupField');
 const chat       = document.getElementById('chat');
@@ -546,7 +558,9 @@ const editCancel = document.getElementById('editCancel');
 const editSave   = document.getElementById('editSave');
 
 /* ===== สถานะแอป ===== */
-const state = { sets:[], pending:[], setCount:2, layout:'lr', grid4:'center', dup:false };
+/* ตำแหน่งป้ายที่เลือกได้: t=บน c=กลาง b=ล่าง / l=ซ้าย c=กลาง r=ขวา */
+const STAMP_POS = ['tl','tc','tr','c','bl','bc','br'];
+const state = { sets:[], pending:[], setCount:2, layout:'lr', stampPos:'c', dup:false };
 let nextId = 1;
 let pid = 1;
 let pendingEl = null;
@@ -559,7 +573,7 @@ function saveSettings(){
       sender: senderInput.value,
       count: state.setCount,
       layout: state.layout,
-      grid4: state.grid4,
+      stampPos: state.stampPos,
       dup: state.dup
     }));
   }catch(e){}
@@ -649,7 +663,7 @@ function roundRect(ctx,x,y,w,h,r){
 }
 
 /* ===== ประกอบภาพด้วย Canvas → คืนค่าเป็น Blob (JPEG 0.92) ===== */
-async function compose(images, layout, count, center, dup){
+async function compose(images, layout, count, stampPos, dup){
   const size=CANVAS_SIZE, half=size/2;
   const canvas=document.createElement('canvas');
   canvas.width=size; canvas.height=size;
@@ -686,14 +700,19 @@ async function compose(images, layout, count, center, dup){
   // ตัวคูณสัดส่วน (อิงฐาน 1280) เพื่อให้ป้าย/ตัวอักษรคงสัดส่วนเมื่อย่อขนาด
   const k=size/1280;
 
-  // แปะป้ายสาขา — center=วางกลางผืน (โหมดจัดมุม) / ปกติ=กลางล่าง
+  // แปะป้ายสาขา ตามตำแหน่งที่เลือก (ซ้าย/กลาง/ขวา × บน/กลาง/ล่าง)
   const dateStr=formatDDMMYY(dateInput.value||todayYMD());
   const stamp=await loadStamp();
   if(stamp){
+    const pos = STAMP_POS.includes(stampPos) ? stampPos : 'c';
+    const center = (pos==='c');
+    const vAlign = center ? 'c' : pos[0];      // t / c / b
+    const hAlign = center ? 'c' : pos[1];      // l / c / r
     const sw=center ? size*0.36 : size*0.4;    // ป้ายกลางเล็กกว่าเล็กน้อย
     const sh=sw*((stamp.naturalHeight||stamp.height)/(stamp.naturalWidth||stamp.width));
-    const sx=(size-sw)/2;
-    const sy=center ? (size-sh)/2 : size-32*k-sh;
+    const m=32*k;                              // ระยะขอบจากมุม/ขอบผืนผ้าใบ
+    const sx = hAlign==='l' ? m : hAlign==='r' ? size-m-sw : (size-sw)/2;
+    const sy = vAlign==='t' ? m : vAlign==='b' ? size-m-sh : (size-sh)/2;
     ctx.save();
     ctx.shadowColor='rgba(0,0,0,0.25)';
     ctx.shadowBlur=20*k;
@@ -702,7 +721,7 @@ async function compose(images, layout, count, center, dup){
     ctx.restore();                 // รีเซ็ตเงา
 
     // เขียนวันที่ปัจจุบันลงกลางป้าย (ตรงเส้นคั่นสีทอง) อัตโนมัติทุกครั้ง
-    const dcx=size/2, dcy=sy+sh*STAMP_DIVIDER_FRAC;
+    const dcx=sx+sw/2, dcy=sy+sh*STAMP_DIVIDER_FRAC;
     const dFont=Math.round(sw*0.06);
     ctx.font=`700 ${dFont}px "Noto Sans Thai", system-ui, sans-serif`;
     ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -718,7 +737,7 @@ async function compose(images, layout, count, center, dup){
     // คำอธิบายเพิ่มเติม (ถ้ากรอก) วางใต้วันที่ในป้าย เหนือโลโก้ Lotus's
     const note=senderInput.value.trim();
     if(note){
-      const ncx=size/2, ncy=sy+sh*0.79;
+      const ncx=sx+sw/2, ncy=sy+sh*0.79;
       let nFont=Math.round(sw*0.05);
       ctx.font=`600 ${nFont}px "Noto Sans Thai", system-ui, sans-serif`;
       const maxW=sw*0.9;
@@ -790,7 +809,7 @@ function makeResultBubble(set){
 /* ===== เรนเดอร์ผลลัพธ์ลงบับเบิล ===== */
 async function renderSet(set){
   set.resultBubble.innerHTML='<div class="loading"><div class="spinner"></div>กำลังประมวลผล...</div>';
-  const blob=await compose(set.images, set.layout, set.setCount, set.grid4==='center', set.dup);
+  const blob=await compose(set.images, set.layout, set.setCount, set.stampPos, set.dup);
   if(set.url) URL.revokeObjectURL(set.url);
   set.blob=blob;
   set.url=URL.createObjectURL(blob);
@@ -829,7 +848,7 @@ async function commitSet(images){
   const userRow=makeUserBubble(images);
   chat.appendChild(userRow);
 
-  const set={ id:nextId++, images:images.slice(), layout:state.layout, setCount:state.setCount, grid4:state.grid4, dup:state.dup, userRow:userRow, url:null, blob:null };
+  const set={ id:nextId++, images:images.slice(), layout:state.layout, setCount:state.setCount, stampPos:state.stampPos, dup:state.dup, userRow:userRow, url:null, blob:null };
   state.sets.push(set);
   const resultRow=makeResultBubble(set);
   chat.appendChild(resultRow);
@@ -1008,7 +1027,7 @@ dateInput.onchange=updateDateDisplay;
 
 function updateSubFields(){
   layoutField.style.display = state.setCount===2 ? '' : 'none';  // เลือกกริดย่อยเฉพาะ 2 รูป
-  grid4Field.style.display  = state.setCount===4 ? '' : 'none';  // เลือกรูปแบบป้ายเฉพาะ 4 รูป
+  // ตำแหน่งป้าย: เลือกได้ทุกจำนวนรูป (จึงแสดงเสมอ)
   dupField.style.display    = state.setCount>1 ? '' : 'none';    // ทำซ้ำเฉพาะเมื่อมีหลายช่อง
 }
 segCount.onclick=async(e)=>{
@@ -1025,10 +1044,10 @@ segLayout.onclick=(e)=>{
   setPressed(segLayout,'layout',b.dataset.layout);
   saveSettings();
 };
-segGrid4.onclick=(e)=>{
-  const b=e.target.closest('button[data-grid4]'); if(!b) return;
-  state.grid4=b.dataset.grid4;
-  setPressed(segGrid4,'grid4',b.dataset.grid4);
+segStamp.onclick=(e)=>{
+  const b=e.target.closest('button[data-pos]'); if(!b) return;
+  state.stampPos=b.dataset.pos;
+  setPressed(segStamp,'pos',b.dataset.pos);
   saveSettings();
 };
 segDup.onclick=async(e)=>{
@@ -1269,10 +1288,12 @@ window.addEventListener('resize', ()=>{ if(ED.set) applyAll(); });
   // จำนวนรูปต่อชุด: ดีฟอลต์ 2 รูป เสมอ (ไม่จำค่าเดิม)
   // ทำซ้ำรูปเดียว: ดีฟอลต์ ปิด เสมอ (ไม่จำค่าเดิม)
   if(s.layout==='tb'){ state.layout='tb'; }
-  if(s.grid4==='bottom'){ state.grid4='bottom'; }   // ดีฟอลต์ ป้ายกลาง, จำค่าเดิมถ้าเคยเลือกป้ายล่าง
+  // ตำแหน่งป้าย: ดีฟอลต์ กลาง, จำค่าเดิมที่เคยเลือก (รองรับค่าเก่า grid4 = bottom)
+  if(STAMP_POS.includes(s.stampPos)) state.stampPos=s.stampPos;
+  else if(s.grid4==='bottom') state.stampPos='bc';
   setPressed(segCount,'count',String(state.setCount));
   setPressed(segLayout,'layout',state.layout);
-  setPressed(segGrid4,'grid4',state.grid4);
+  setPressed(segStamp,'pos',state.stampPos);
   setPressed(segDup,'dup',state.dup?'on':'off');
   updateSubFields();
 
