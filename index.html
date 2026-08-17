@@ -1306,7 +1306,17 @@ window.addEventListener('resize', ()=>{ if(ED.set) applyAll(); });
    ทำงานเฉพาะเมื่อเปิดผ่าน http(s) เท่านั้น (เปิดไฟล์ file:// จะข้าม) */
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.update();                                  // เช็คเวอร์ชันใหม่ทุกครั้งที่เปิดแอป
+    }).catch(()=>{});
+    // มี service worker เวอร์ชันใหม่เข้ามาคุมแทน → รีโหลดให้ใช้ไฟล์ใหม่ทันที (ครั้งเดียว)
+    // ครั้งแรกที่ยังไม่เคยมี controller ถือเป็นการติดตั้ง ไม่ต้องรีโหลด
+    let swReloaded = !navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+      if(swReloaded) return;
+      swReloaded=true;
+      location.reload();
+    });
   });
 }
 </script>
