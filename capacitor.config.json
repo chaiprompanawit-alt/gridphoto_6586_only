@@ -1,0 +1,7 @@
+{
+  "appId": "th.pongsanuk.gridphoto",
+  "appName": "ประกอบรูป ปงสนุก",
+  "webDir": "www",
+  "android": { "allowMixedContent": false },
+  "server": { "androidScheme": "https" }
+}
