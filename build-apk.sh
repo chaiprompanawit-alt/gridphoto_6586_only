@@ -15,7 +15,10 @@ export LC_ALL=C
 # 1) อัปเดตไฟล์เว็บลง www/ (คงการแก้ฟอนต์+ปิด SW ที่ทำไว้แล้ว)
 python3 sync-www.py
 
-# 2) build ในโฟลเดอร์ ASCII (path ภาษาไทยเคยมีปัญหากับเครื่องมือบางตัว)
+# 2) คัดลอกไฟล์เว็บเข้าโปรเจกต์ Android (ขาดขั้นนี้ APK จะได้ไฟล์เว็บชุดเก่า)
+npx cap copy android
+
+# 3) build ในโฟลเดอร์ ASCII (path ภาษาไทยเคยมีปัญหากับเครื่องมือบางตัว)
 BUILD="$HOME/gridphoto-build"
 mkdir -p "$BUILD"
 rsync -a --delete android www capacitor.config.json package.json node_modules gridphoto-release.keystore keystore.properties "$BUILD/"

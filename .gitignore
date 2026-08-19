@@ -8,3 +8,4 @@ android/capacitor-cordova-android-plugins/
 *.apk
 gridphoto-release.keystore
 keystore.properties
+testphotos/

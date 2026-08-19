@@ -521,6 +521,8 @@ const STAMP_DIVIDER_FRAC = 0.66;    // ตำแหน่งวางวัน�
 /* ===== ขนาด/คุณภาพไฟล์ผลลัพธ์ (ย่อขนาดให้ส่งไลน์ไว) ===== */
 const CANVAS_SIZE = 1080;           // ผืนผ้าใบ (ลดจาก 1280 เพื่อไฟล์เล็กลง ยังอ่านใบเสร็จได้)
 const JPEG_QUALITY = 0.8;           // คุณภาพ JPEG (ลดจาก 0.92)
+const MAX_SRC = CANVAS_SIZE * 2;    // ย่อรูปต้นทางเหลือด้านยาวเท่านี้ตอนนำเข้า (ดู prepareImage)
+const MAX_VIEW = 1080;              // ขนาดรูปที่ใช้แค่แสดงบนหน้าจอ (คิว + หน้าปรับมุมรูป)
 
 /* ไอคอนบับเบิลแชทสไตล์ไลน์ (สีขาวบนปุ่มเขียว) */
 const LINE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.3c-5 0-9 3.15-9 7.02 0 3.47 3.18 6.38 7.47 6.93.29.06.69.19.79.44.09.22.06.57.03.79l-.13.77c-.04.23-.18.9.79.49.97-.41 5.23-3.08 7.14-5.28C21.13 14.05 22 12.6 22 10.32 22 6.45 17.5 3.3 12 3.3z"/></svg>';
@@ -617,6 +619,48 @@ async function loadBitmap(file){
   });
 }
 
+/* ===== เตรียมรูปหนึ่งครั้งตอนนำเข้า =====
+   รูปจากกล้องมักใหญ่ราว 12 ล้านพิกเซล แต่ผืนผ้าใบมีแค่ CANVAS_SIZE
+   ถ้าถอดรหัสไฟล์เต็มทุกครั้งที่เรนเดอร์จะช้ามากและกินแรมหนัก
+   จึงย่อครั้งเดียวเก็บเป็นบิตแมปไว้ใช้ซ้ำ พร้อม url รูปย่อไว้แสดงผล */
+async function prepareImage(file){
+  const raw=await loadBitmap(file);
+  const rw=raw.naturalWidth||raw.width, rh=raw.naturalHeight||raw.height;
+  const k=Math.min(1, MAX_SRC/Math.max(rw,rh));
+  const w=Math.max(1,Math.round(rw*k)), h=Math.max(1,Math.round(rh*k));
+
+  let bmp=raw;
+  if(k<1){
+    try{
+      bmp=await createImageBitmap(raw,{resizeWidth:w,resizeHeight:h,resizeQuality:'high'});
+      if(raw.close) raw.close();
+    }catch(e){
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(raw,0,0,w,h);
+      if(raw.close) raw.close();
+      bmp=cv;                       // canvas ใช้เป็นแหล่งวาดได้เหมือนกัน
+    }
+  }
+
+  // รูปย่อสำหรับแสดงผล (ตัวอย่างในคิว + หน้าปรับมุมรูป) จะได้ไม่ต้องกางไฟล์เต็มใน <img>
+  // เล็กกว่าตัวที่ใช้วาดจริงได้ เพราะหน้าจอมือถือกว้างไม่เกินราวนี้อยู่แล้ว
+  const dk=Math.min(1, MAX_VIEW/Math.max(w,h));
+  const dw=Math.max(1,Math.round(w*dk)), dh=Math.max(1,Math.round(h*dk));
+  const cv=document.createElement('canvas'); cv.width=dw; cv.height=dh;
+  cv.getContext('2d').drawImage(bmp,0,0,dw,dh);
+  const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.85));
+
+  return { pid:pid++, file, bmp, _iw:dw, _ih:dh, url:URL.createObjectURL(blob) };
+}
+
+/* คืนหน่วยความจำของรูปหนึ่งใบ */
+function releaseImage(im){
+  if(!im) return;
+  if(im.url) URL.revokeObjectURL(im.url);
+  if(im.bmp && im.bmp.close) im.bmp.close();
+  im.bmp=null;
+}
+
 /* ===== โหลดป้ายสาขา (แคชไว้ ถ้าโหลดไม่ได้ให้ข้าม) ===== */
 let stampPromise=null;
 function loadStamp(){
@@ -689,9 +733,9 @@ async function compose(images, layout, count, stampPos, dup){
   for(let i=0;i<cells.length;i++){
     const src = dup ? images[0] : images[i];   // โหมดทำซ้ำ: ใช้รูปแรกเติมทุกช่อง
     if(!src) continue;
-    const img=await loadBitmap(src.file);
+    const img=src.bmp;                 // บิตแมปย่อที่เตรียมไว้ตอนนำเข้า
+    if(!img) continue;
     drawCell(ctx,img,cells[i][0],cells[i][1],cells[i][2],cells[i][3], src.tf);
-    if(img.close) img.close();
   }
 
   // เตรียมฟอนต์ก่อนวัด/วาดข้อความ
@@ -863,7 +907,7 @@ function removeSet(set){
   const i=state.sets.indexOf(set);
   if(i>=0) state.sets.splice(i,1);
   if(set.url) URL.revokeObjectURL(set.url);
-  set.images.forEach(im=>URL.revokeObjectURL(im.url));
+  set.images.forEach(releaseImage);
   set.userRow.remove();
   set.resultRow.remove();
   updateUI();
@@ -894,7 +938,7 @@ function renderPending(){
     btn.onclick=()=>{
       const id=Number(btn.dataset.pid);
       const idx=state.pending.findIndex(p=>p.pid===id);
-      if(idx>=0){ URL.revokeObjectURL(state.pending[idx].url); state.pending.splice(idx,1); }
+      if(idx>=0){ releaseImage(state.pending[idx]); state.pending.splice(idx,1); }
       renderPending();
     };
   });
@@ -907,17 +951,33 @@ async function addFiles(fileList){
   const files=Array.from(fileList||[]).filter(f=>f.type.startsWith('image/'));
   if(files.length===0) return;
   setSettingsOpen(false);              // เริ่มมีรูปแล้ว → พับแผงตั้งค่าอัตโนมัติ
-  // โหมดทำซ้ำ: รูปแต่ละใบสร้างเป็น 1 ชุด (เติมทุกช่องด้วยรูปเดียว) ทันที
-  if(state.dup){
-    for(const f of files){
-      await commitSet([{ pid:pid++, file:f, url:URL.createObjectURL(f) }]);
+  showPrep(files.length);              // การย่อรูปใช้เวลาสักครู่ บอกผู้ใช้ไว้ก่อน
+  try{
+    // โหมดทำซ้ำ: รูปแต่ละใบสร้างเป็น 1 ชุด (เติมทุกช่องด้วยรูปเดียว) ทันที
+    if(state.dup){
+      for(const f of files){
+        await commitSet([ await prepareImage(f) ]);
+      }
+      return;
     }
-    return;
-  }
-  files.forEach(f=> state.pending.push({ pid:pid++, file:f, url:URL.createObjectURL(f) }));
-  await flushPending();
-  renderPending();
+    for(const f of files){ state.pending.push(await prepareImage(f)); }
+    await flushPending();
+    renderPending();
+  }finally{ hidePrep(); }
 }
+
+/* แถบสถานะระหว่างย่อรูป */
+let prepEl=null;
+function showPrep(n){
+  if(!prepEl){
+    prepEl=document.createElement('div');
+    prepEl.className='row right';
+    prepEl.innerHTML='<div class="bubble user"><div class="loading"><div class="spinner"></div>'
+      + 'กำลังเตรียมรูป '+n+' รูป...</div></div>';
+  }
+  chat.appendChild(prepEl); scrollBottom();
+}
+function hidePrep(){ if(prepEl){ prepEl.remove(); prepEl=null; } }
 
 /* ===== ตัดคิวเป็นชุด ๆ ตราบใดที่ครบจำนวน ===== */
 async function flushPending(){
