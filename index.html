@@ -991,14 +991,64 @@ async function flushPending(){
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
 
+/* ===== สะพานไปแอป Android (Capacitor) =====
+   WebView ของ Android ไม่รองรับ <a download> กับ blob: และไม่มี navigator.share
+   จึงต้องส่งรูปเป็น base64 ให้ปลั๊กอิน SaveImage เขียนไฟล์/เปิดชีตแชร์ฝั่ง native */
+const NATIVE = (()=>{
+  const C = window.Capacitor;
+  if(!C || !C.isNativePlatform || !C.isNativePlatform()) return null;
+  try{ return C.registerPlugin ? C.registerPlugin('SaveImage') : (C.Plugins && C.Plugins.SaveImage) || null; }
+  catch(e){ return null; }
+})();
+
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(',')[1]);
+    r.onerror=()=>rej(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+/* ===== แจ้งผลสั้น ๆ ท้ายจอ ===== */
+let toastTimer=null;
+function toast(msg){
+  let el=document.getElementById('toast');
+  if(!el){
+    el=document.createElement('div'); el.id='toast';
+    el.style.cssText='position:fixed;left:50%;bottom:88px;transform:translateX(-50%);'
+      +'background:rgba(20,20,20,.92);color:#fff;padding:10px 18px;border-radius:999px;'
+      +'font-size:14px;z-index:9999;max-width:86vw;text-align:center;pointer-events:none;'
+      +'box-shadow:0 6px 20px rgba(0,0,0,.3)';
+    document.body.appendChild(el);
+  }
+  el.textContent=msg; el.style.opacity='1';
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{ el.style.opacity='0'; }, 2200);
+}
+
 /* ===== ดาวน์โหลดหนึ่งไฟล์ ===== */
 function triggerDownload(url, name){
   const a=document.createElement('a');
   a.href=url; a.download=name;
   document.body.appendChild(a); a.click(); a.remove();
 }
-function downloadSet(set){
+
+/* เซฟลงแกลเลอรีผ่านปลั๊กอิน คืน true ถ้าจัดการให้แล้ว */
+async function nativeSave(set, index){
+  if(!NATIVE || !set.blob) return false;
+  try{
+    await NATIVE.save({ data: await blobToBase64(set.blob), name: buildFileName(index) });
+    return true;
+  }catch(e){
+    toast('เซฟไม่สำเร็จ: '+(e && e.message ? e.message : e));
+    return true;   // แจ้งผู้ใช้แล้ว ไม่ต้องตกไปทางเดิมที่ใช้ไม่ได้อยู่ดี
+  }
+}
+
+async function downloadSet(set){
   if(!set.url) return;
+  if(await nativeSave(set, state.sets.indexOf(set)+1)){ toast('บันทึกลงแกลเลอรีแล้ว'); return; }
   // iOS เซฟลงแกลเลอรีตรง ๆ ไม่ได้ → เปิด Share sheet ให้เลือก "บันทึกภาพ"
   if(IS_IOS && set.blob && navigator.canShare){
     const file=setToFile(set, state.sets.indexOf(set)+1);
@@ -1010,6 +1060,17 @@ function downloadSet(set){
   triggerDownload(set.url, buildFileName(state.sets.indexOf(set)+1));
 }
 async function downloadAll(){
+  if(NATIVE){
+    let n=0;
+    for(let i=0;i<state.sets.length;i++){
+      const s=state.sets[i];
+      if(!s.blob) continue;
+      try{ await NATIVE.save({ data: await blobToBase64(s.blob), name: buildFileName(i+1) }); n++; }
+      catch(e){ toast('เซฟไม่สำเร็จ: '+(e && e.message ? e.message : e)); return; }
+    }
+    toast(`บันทึกลงแกลเลอรีแล้ว ${n} รูป`);
+    return;
+  }
   // iOS: ดาวน์โหลดหลายไฟล์พร้อมกันไม่ได้ → ใช้ Share sheet (เลือก "บันทึกภาพ")
   if(IS_IOS){ await shareAll(); return; }
   for(let i=0;i<state.sets.length;i++){
@@ -1024,8 +1085,27 @@ async function downloadAll(){
 function setToFile(set, index){
   return new File([set.blob], buildFileName(index), { type:'image/jpeg' });
 }
+
+/* แชร์ผ่านปลั๊กอิน คืน true ถ้าจัดการให้แล้ว */
+async function nativeShare(sets){
+  if(!NATIVE) return false;
+  const list=sets.filter(s=>s.blob);
+  if(list.length===0) return true;
+  try{
+    const files=[];
+    for(const s of list){
+      files.push({ data: await blobToBase64(s.blob), name: buildFileName(state.sets.indexOf(s)+1) });
+    }
+    await NATIVE.share({ files });
+  }catch(e){
+    toast('แชร์ไม่สำเร็จ: '+(e && e.message ? e.message : e));
+  }
+  return true;
+}
+
 async function shareSet(set){
   if(!set.blob) return;
+  if(await nativeShare([set])) return;
   const file=setToFile(set, state.sets.indexOf(set)+1);
   if(navigator.canShare && navigator.canShare({ files:[file] })){
     try{ await navigator.share({ files:[file] }); }
@@ -1037,6 +1117,7 @@ async function shareSet(set){
   }
 }
 async function shareAll(){
+  if(await nativeShare(state.sets)) return;
   const files=state.sets.filter(s=>s.blob).map((s,i)=>setToFile(s, i+1));
   if(files.length===0) return;
   if(navigator.canShare && navigator.canShare({ files })){

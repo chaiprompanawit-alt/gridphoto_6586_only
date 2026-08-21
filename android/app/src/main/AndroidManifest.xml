@@ -40,5 +40,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Android 9 ลงมาเท่านั้น: 10 ขึ้นไปเขียนผ่าน MediaStore ได้โดยไม่ต้องขอสิทธิ์ -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>
